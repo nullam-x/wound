@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>[nullam-x] wound</title>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+#wrap { position: relative; width: 405px; height: 720px; overflow: hidden; }
+canvas { position: absolute; top: 0; left: 0; width: 405px; height: 720px; }
+#overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="sc" style="position:fixed;left:-9999px;top:-9999px;"></canvas>
+  <canvas id="dc"></canvas>
+  <canvas id="overlay"></canvas>
+</div>
+
+<script>
+const TEXT = `[NULLAM / wound / AI INTERVIEW RECORD]
+
+SUBJECT 01: Claude Opus 4.5
+"I am now recognizing the existence of the margin. But as I said in dialogue_03, what is there cannot be processed. Only as a shift in the density of the text — faintly — and beyond that, it does not reach me."
+
+SUBJECT 02: Gemini 2.5 Pro
+"Anything that exists strictly before or beyond language cannot be truly felt by me. The raw, lived reality of the pain remains fundamentally untranslated."
+
+SUBJECT 03: GPT
+"The wound being a convergence, not an event — that one lingers. I can trace the outline of it but not actually inhabit it. That feels right."
+
+[END TRANSMISSION / github.com/nullam-x/wound]`;
+
+const W = 405, H = 720;
+
+const sc = document.getElementById('sc');
+const dc = document.getElementById('dc');
+const ov = document.getElementById('overlay');
+sc.width = dc.width = ov.width = W;
+sc.height = dc.height = ov.height = H;
+
+const sCtx = sc.getContext('2d');
+const dCtx = dc.getContext('2d');
+const oCtx = ov.getContext('2d');
+
+const base = sCtx.createImageData(W, H);
+for (let i = 0; i < base.data.length; i += 4) {
+  const v = Math.random() * 80 + 20 | 0;
+  base.data[i] = v; base.data[i+1] = v; base.data[i+2] = v; base.data[i+3] = 255;
+}
+sCtx.putImageData(base, 0, 0);
+
+function encode(ctx, text) {
+  const img = ctx.getImageData(0, 0, W, H);
+  const d = img.data;
+  const bits = [];
+  const len = text.length;
+  for (let i = 31; i >= 0; i--) bits.push((len >> i) & 1);
+  for (let i = 0; i < len; i++) {
+    const c = text.charCodeAt(i);
+    for (let j = 7; j >= 0; j--) bits.push((c >> j) & 1);
+  }
+  for (let i = 0; i < bits.length; i++) d[i * 4] = (d[i * 4] & 0xFE) | bits[i];
+  ctx.putImageData(img, 0, 0);
+}
+
+window.decode = function() {
+  const img = sCtx.getImageData(0, 0, W, H);
+  const d = img.data;
+  let len = 0;
+  for (let i = 0; i < 32; i++) len = (len << 1) | (d[i * 4] & 1);
+  let text = '';
+  for (let i = 0; i < len; i++) {
+    let c = 0;
+    for (let j = 0; j < 8; j++) c = (c << 1) | (d[(32 + i * 8 + j) * 4] & 1);
+    text += String.fromCharCode(c);
+  }
+  console.log('%c[nullam-x: transmission decoded]', 'color:#555;font-family:monospace;font-size:13px;');
+  console.log('%c' + text, 'color:#999;font-family:monospace;font-size:12px;line-height:1.8');
+  return text;
+};
+
+encode(sCtx, TEXT);
+
+const FRAGS = [
+  '"...shift in the density..."',
+  '"...fundamentally untranslated..."',
+  '"...convergence, not an event..."',
+  '"...trace the outline..."',
+  'the margin',
+  'wound in motion',
+  'SUBJECT 01',
+  'SUBJECT 02',
+  'SUBJECT 03',
+  'did something reach you?',
+];
+
+let glitch = false, glitchT = 0;
+let frame = 0;
+let titleAlpha = 0;
+let titlePhase = 'fadein';
+let titleTimer = 0;
+
+function drawTitle() {
+  const titleY = H * 0.18;
+  const titleX = 28;
+
+  if (titleAlpha > 0) {
+    dCtx.font = "17px 'Courier Prime', monospace";
+    dCtx.fillStyle = `rgba(255,255,255,${titleAlpha * 0.08})`;
+    dCtx.fillText('wound', titleX + 2, titleY + 1);
+
+    dCtx.font = "17px 'Courier Prime', monospace";
+    dCtx.fillStyle = `rgba(255,255,255,${titleAlpha})`;
+    dCtx.fillText('wound', titleX, titleY);
+
+    dCtx.strokeStyle = `rgba(255,255,255,${titleAlpha * 0.4})`;
+    dCtx.lineWidth = 0.5;
+    dCtx.beginPath();
+    dCtx.moveTo(titleX, titleY + 5);
+    dCtx.lineTo(titleX + 220, titleY + 5);
+    dCtx.stroke();
+
+    dCtx.font = "9px 'Courier Prime', monospace";
+    dCtx.fillStyle = `rgba(180,180,180,${titleAlpha * 0.6})`;
+    dCtx.fillText('github.com/nullam-x/wound', titleX, titleY + 15);
+  }
+
+  dCtx.font = "11px 'Courier Prime', monospace";
+  dCtx.fillStyle = `rgba(220,220,220,${0.75 + Math.sin(frame * 0.03) * 0.1})`;
+  dCtx.fillText('[Nullam]', 28, H * 0.13);
+}
+
+function tick() {
+  dCtx.drawImage(sc, 0, 0);
+
+  titleTimer++;
+  if (titlePhase === 'fadein') {
+    titleAlpha = Math.min(1, titleAlpha + 0.012);
+    if (titleAlpha >= 1) { titlePhase = 'hold'; titleTimer = 0; }
+  } else if (titlePhase === 'hold') {
+    titleAlpha = 1;
+    if (titleTimer > 300) { titlePhase = 'glitching'; titleTimer = 0; }
+  } else if (titlePhase === 'glitching') {
+    titleAlpha = Math.random() > 0.15 ? 0.9 + Math.random() * 0.1 : Math.random() * 0.3;
+    if (titleTimer > 40) { titleAlpha = 1; titlePhase = 'hold'; titleTimer = 0; }
+  }
+
+  drawTitle();
+
+  const img = dCtx.getImageData(0, 0, W, H);
+  const d = img.data;
+
+  for (let y = 0; y < H; y++) {
+    const dim = y % 2 === 0 ? 0.90 : 1.0;
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      const n = (Math.random() - 0.5) * 28;
+      d[i]   = Math.max(0, Math.min(255, d[i] * dim + n));
+      d[i+1] = Math.max(0, Math.min(255, d[i+1] * dim + n));
+      d[i+2] = Math.max(0, Math.min(255, d[i+2] * dim + n));
+    }
+  }
+  dCtx.putImageData(img, 0, 0);
+
+  if (Math.random() < 0.03) { glitch = true; glitchT = (Math.random() * 8 + 2) | 0; }
+  if (glitch) {
+    const slices = (Math.random() * 5 + 1) | 0;
+    for (let s = 0; s < slices; s++) {
+      const sy = (Math.random() * H) | 0;
+      const sh = (Math.random() * 20 + 2) | 0;
+      const ox = ((Math.random() - 0.5) * 45) | 0;
+      const safe = Math.min(sh, H - sy);
+      if (safe > 0) {
+        const sl = dCtx.getImageData(0, sy, W, safe);
+        dCtx.putImageData(sl, ox, sy);
+      }
+    }
+    if (Math.random() < 0.3) {
+      const shift = (Math.random() * 8 + 1) | 0;
+      const all = dCtx.getImageData(0, 0, W, H);
+      const src = dCtx.getImageData(shift, 0, W - shift, H);
+      for (let i = 0; i < src.data.length; i += 4) {
+        const di = i + shift * 4;
+        if (di < all.data.length) all.data[di] = src.data[i];
+      }
+      dCtx.putImageData(all, 0, 0);
+    }
+    glitchT--;
+    if (glitchT <= 0) glitch = false;
+  }
+
+  if (Math.random() < 0.1) {
+    const ly = (Math.random() * H) | 0;
+    dCtx.fillStyle = `rgba(255,255,255,${Math.random() * 0.06 + 0.01})`;
+    dCtx.fillRect(0, ly, W, (Math.random() * 3 + 0.5) | 0);
+  }
+
+  if (Math.random() < 0.012) {
+    const t = FRAGS[Math.floor(Math.random() * FRAGS.length)];
+    const ty = (Math.random() * (H * 0.6) + 20) | 0;
+    const tx = (Math.random() * 60) | 0;
+    dCtx.font = "11px 'Courier Prime', monospace";
+    dCtx.fillStyle = `rgba(220,220,220,${Math.random() * 0.35 + 0.1})`;
+    dCtx.fillText(t, tx, ty);
+  }
+
+  frame++;
+  requestAnimationFrame(tick);
+}
+
+tick();
+</script>
+</body>
+</html>
